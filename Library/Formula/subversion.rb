@@ -3,22 +3,16 @@ require 'formula'
 # On 10.5 we need newer versions of apr, neon etc.
 # On 10.6 we only need a newer version of neon
 class SubversionDeps <Formula
-  url 'http://subversion.tigris.org/downloads/subversion-deps-1.6.9.tar.bz2'
-  md5 'c480173d939a5a6d0c71c717ab71e392'
-
-  # Note because this formula is installed into the subversion prefix
-  # it is not in fact keg only
-  def keg_only?
-    :provided_by_osx
-  end
+  url 'http://subversion.tigris.org/downloads/subversion-deps-1.6.11.tar.bz2'
+  md5 'da1bcdd39c34d91e434407f72b844f2f'
 end
 
 class Subversion <Formula
-  url 'http://subversion.tigris.org/downloads/subversion-1.6.9.tar.bz2'
-  md5 '9c30a47b1d48664e7afef68bb4834c53'
+  url 'http://subversion.tigris.org/downloads/subversion-1.6.11.tar.bz2'
+  md5 '75419159b50661092c4137449940b5cc'
   homepage 'http://subversion.apache.org/'
   
-  aka :svn
+  aka 'svn'
 
   # Only need this on Snow Leopard; for Leopard the deps package 
   # builds it.
@@ -27,9 +21,7 @@ class Subversion <Formula
   def setup_leopard
     # Slot dependencies into place
     d=Pathname.getwd
-    SubversionDeps.new.brew do
-      d.install Dir['*']
-    end
+    SubversionDeps.new.brew { d.install Dir['*'] }
   end
 
   def install
@@ -38,16 +30,29 @@ class Subversion <Formula
     # Use existing system zlib
     # Use dep-provided other libraries
     # Don't mess with Apache modules (since we're not sudo)
-    system "./configure", "--disable-debug",
-                          "--prefix=#{prefix}",
-                          "--with-ssl",
-                          "--with-zlib=/usr/lib",
-                          # use our neon, not OS X's 
-                          "--disable-neon-version-check",
-                          "--disable-mod-activation",
-                          "--without-apache-libexecdir",
-                          "--without-berkeley-db"
+    args = ["--disable-debug",
+            "--prefix=#{prefix}",
+            "--with-ssl",
+            "--with-zlib=/usr/lib",
+            # use our neon, not OS X's
+            "--disable-neon-version-check",
+            "--disable-mod-activation",
+            "--without-apache-libexecdir",
+            "--without-berkeley-db"]
+
+    if ARGV.include? "--java"
+      args << "--enable-javalhl" << "--without-jikes"
+    end
+
+    system "./configure", *args
+
     system "make"
     system "make install"
+
+    if ARGV.include? "--java"
+      ENV.j1
+      system "make javahl"
+      system "make install-javahl"
+    end
   end
 end

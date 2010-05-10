@@ -130,25 +130,26 @@ def gzip path
   return Pathname.new(path+".gz")
 end
 
-# returns array of architectures suitable for -arch gcc flag
+# Returns array of architectures that the given command is built for.
 def archs_for_command cmd
-    cmd = `/usr/bin/which #{cmd}` unless Pathname.new(cmd).absolute?
-    cmd.gsub! ' ', '\\ '
+  cmd = cmd.to_s # If we were passed a Pathname, turn it into a string.
+  cmd = `/usr/bin/which #{cmd}` unless Pathname.new(cmd).absolute?
+  cmd.gsub! ' ', '\\ '  # Escape spaces in the filename.
 
-    IO.popen("/usr/bin/file #{cmd}").readlines.inject(%w[]) do |archs, line|
-      case line
-      when /Mach-O executable ppc/
-        archs << :ppc7400
-      when /Mach-O 64-bit executable ppc64/
-        archs << :ppc64
-      when /Mach-O executable i386/
-        archs << :i386
-      when /Mach-O 64-bit executable x86_64/
-        archs << :x86_64
-      else
-        archs
-      end
+  IO.popen("/usr/bin/file #{cmd}").readlines.inject(%w[]) do |archs, line|
+    case line
+    when /Mach-O executable ppc/
+      archs << :ppc7400
+    when /Mach-O 64-bit executable ppc64/
+      archs << :ppc64
+    when /Mach-O executable i386/
+      archs << :i386
+    when /Mach-O 64-bit executable x86_64/
+      archs << :x86_64
+    else
+      archs
     end
+  end
 end
 
 # String extensions added by inreplace below.
@@ -157,14 +158,20 @@ module HomebrewInreplaceExtension
   # value with "new_value", or removes the definition entirely.
   def change_make_var! flag, new_value
     new_value = "#{flag}=#{new_value}"
-    gsub! Regexp.new("^#{flag}\\s*=\\s*(.*)$"), new_value
+    gsub! Regexp.new("^#{flag}[ \\t]*=[ \\t]*(.*)$"), new_value
   end
   # Removes variable assignments completely.
   def remove_make_var! flags
     flags.each do |flag|
       # Also remove trailing \n, if present.
-      gsub! Regexp.new("^#{flag}\\s*=(.*)$\n?"), ""
+      gsub! Regexp.new("^#{flag}[ \\t]*=(.*)$\n?"), ""
     end
+  end
+  # Finds the specified variable
+  def get_make_var flag
+    m = match Regexp.new("^#{flag}[ \\t]*=[ \\t]*(.*)$")
+    return m[1] if m
+    return nil
   end
 end
 
@@ -204,5 +211,14 @@ def nostdout
     ensure
       $stdout = real_stdout
     end
+  end
+end
+
+def dump_build_env env
+  puts "\"--use-llvm\" was specified" if ARGV.include? '--use-llvm'
+
+  %w[CC CXX LD CFLAGS CXXFLAGS CPPFLAGS LDFLAGS MACOSX_DEPLOYMENT_TARGET MAKEFLAGS PATH PKG_CONFIG_PATH HOMEBREW_USE_LLVM].each do |k|
+    value = env[k]
+    puts "#{k}: #{value}" if value
   end
 end
